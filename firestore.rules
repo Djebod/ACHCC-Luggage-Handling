@@ -1,0 +1,42 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'admin';
+    }
+
+    // 1. system collection
+    match /system/{document} {
+      allow read, write: if true;
+    }
+
+    // 2. users collection
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if !exists(/databases/$(database)/documents/system/config) || 
+                       get(/databases/$(database)/documents/system/config).data.seeded != true ||
+                       isAdmin();
+      allow update: if isAdmin() || (request.auth.uid == userId && request.resource.data.role == resource.data.role);
+      allow delete: if isAdmin();
+    }
+
+    // 3. luggage collection
+    match /luggage/{luggageId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // 4. settings/sync collection
+    match /settings/sync {
+      allow read, write: if isSignedIn();
+    }
+  }
+}

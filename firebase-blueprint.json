@@ -1,0 +1,77 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User account information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "staff"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "email", "name", "role", "createdAt"]
+    },
+    "Luggage": {
+      "title": "Luggage",
+      "description": "Luggage deposit record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "namaTamu": { "type": "string" },
+        "roomNumber": { "type": "string" },
+        "typeHandling": { "type": "string", "enum": ["Standard", "Fragile", "Heavy", "High Value"] },
+        "remark": { "type": "string" },
+        "status": { "type": "string", "enum": ["Gudang", "Sudah Diambil"] },
+        "photo": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "dateDelivered": { "type": "string" },
+        "timeDelivered": { "type": "string" },
+        "handleBy": { "type": "string" },
+        "avgDeliverMinutes": { "type": "number" }
+      },
+      "required": ["id", "namaTamu", "roomNumber", "typeHandling", "status", "createdAt"]
+    },
+    "SyncSettings": {
+      "title": "SyncSettings",
+      "description": "Google Sheet and AppScript integration settings",
+      "type": "object",
+      "properties": {
+        "googleSheetUrl": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "updatedBy": { "type": "string" }
+      },
+      "required": ["googleSheetUrl"]
+    },
+    "SystemConfig": {
+      "title": "SystemConfig",
+      "description": "System configuration state",
+      "type": "object",
+      "properties": {
+        "seeded": { "type": "boolean" }
+      },
+      "required": ["seeded"]
+    }
+  },
+  "firestore": {
+    "system/config": {
+      "schema": "SystemConfig",
+      "description": "Track database seeding state"
+    },
+    "users/{userId}": {
+      "schema": "User",
+      "description": "Aston Cirebon registered users"
+    },
+    "luggage/{luggageId}": {
+      "schema": "Luggage",
+      "description": "Guest luggage deposit items"
+    },
+    "settings/sync": {
+      "schema": "SyncSettings",
+      "description": "Google Sheets syncing settings"
+    }
+  }
+}

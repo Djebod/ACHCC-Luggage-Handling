@@ -1,0 +1,43 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --color-aston-blue: #002B5B;
+  --color-aston-gold: #fbbf24;
+  --color-aston-gold-hover: #f59e0b;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #F1F3F6;
+  color: #1e293b;
+}
+
+/* Custom CSS for thermal receipt printing */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #print-receipt-section, #print-receipt-section * {
+    visibility: visible;
+  }
+  #print-receipt-section {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: 80mm; /* standard receipt width */
+    margin: 0;
+    padding: 10px;
+    background: white;
+    color: black;
+    font-family: monospace;
+  }
+  /* Hide UI components when printing */
+  .no-print {
+    display: none !important;
+  }
+}
