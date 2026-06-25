@@ -14,7 +14,7 @@ import {
   OperationType
 } from '../firebase';
 
-export async function seedInitialUsers() {
+export async function seedInitialUsers(force = false) {
   const systemConfigRef = doc(db, 'system', 'config');
   let systemConfigSnap;
   
@@ -28,7 +28,7 @@ export async function seedInitialUsers() {
   }
   
   try {
-    if (systemConfigSnap.exists() && systemConfigSnap.data().seeded) {
+    if (!force && systemConfigSnap.exists() && systemConfigSnap.data().seeded) {
       console.log('Database already seeded.');
       return { success: true, message: 'Already seeded' };
     }
