@@ -43,6 +43,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       const uid = user.uid;
       const email = user.email || '';
       const name = user.displayName || 'Staff Google';
+      const isITM = email.toLowerCase() === 'itm@astoncirebon.com';
 
       // Check if user exists in Firestore
       const userDocRef = doc(db, 'users', uid);
@@ -50,29 +51,60 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
       if (userDocSnap.exists()) {
         const userData = userDocSnap.data();
+        let role = (userData.role as 'admin' | 'staff') || 'staff';
+        let approved = userData.approved;
+
+        if (isITM) {
+          role = 'admin';
+          approved = true;
+          // Ensure database is updated
+          if (userData.role !== 'admin' || userData.approved !== true) {
+            await setDoc(userDocRef, { ...userData, role: 'admin', approved: true }, { merge: true });
+          }
+        }
+
+        // System rejects login when user is not approved and is not an admin
+        if (approved !== true && role !== 'admin') {
+          await auth.signOut();
+          setError('Akun Anda belum disetujui oleh Admin. Silakan hubungi Admin untuk mendapatkan persetujuan masuk.');
+          setIsLoading(false);
+          return;
+        }
+
         onLoginSuccess({
           uid,
           email: userData.email || email,
           name: userData.name || name,
-          role: (userData.role as 'admin' | 'staff') || 'staff'
+          role: role
         });
       } else {
-        // Automatically register as Staff
+        // Automatically register
+        const role = isITM ? 'admin' : 'staff';
+        const approved = isITM ? true : false; // Staff needs approval
+
         const newUserProfile = {
           uid,
           email,
           name,
-          role: 'staff',
+          role,
+          approved,
           createdAt: new Date().toISOString()
         };
         
         await setDoc(userDocRef, newUserProfile);
         
+        if (approved !== true && role !== 'admin') {
+          await auth.signOut();
+          setError('Registrasi berhasil! Akun Anda (Staff) sedang menunggu persetujuan Admin sebelum dapat masuk.');
+          setIsLoading(false);
+          return;
+        }
+
         onLoginSuccess({
           uid,
           email,
           name,
-          role: 'staff'
+          role
         });
       }
     } catch (err: any) {
@@ -123,18 +155,41 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       // 1. Sign in with Firebase Auth
       const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
       const uid = userCredential.user.uid;
+      const userEmail = userCredential.user.email || email.trim();
 
       // 2. Fetch user profile from Firestore 'users' collection to check roles and verify active status
       const userDocRef = doc(db, 'users', uid);
       const userDocSnap = await getDoc(userDocRef);
 
+      const isITM = userEmail.toLowerCase() === 'itm@astoncirebon.com';
+
       if (userDocSnap.exists()) {
         const userData = userDocSnap.data();
+        let role = (userData.role as 'admin' | 'staff') || 'staff';
+        let approved = userData.approved;
+
+        if (isITM) {
+          role = 'admin';
+          approved = true;
+          // Ensure database is updated
+          if (userData.role !== 'admin' || userData.approved !== true) {
+            await setDoc(userDocRef, { ...userData, role: 'admin', approved: true }, { merge: true });
+          }
+        }
+
+        // System rejects login when user is not approved and is not an admin
+        if (approved !== true && role !== 'admin') {
+          await auth.signOut();
+          setError('Akun Anda belum disetujui oleh Admin. Silakan hubungi Admin untuk mendapatkan persetujuan masuk.');
+          setIsLoading(false);
+          return;
+        }
+
         onLoginSuccess({
           uid,
-          email: userData.email,
+          email: userData.email || userEmail,
           name: userData.name,
-          role: userData.role as 'admin' | 'staff'
+          role: role
         });
       } else {
         // Automatically check if this is one of our default seed accounts
@@ -143,21 +198,24 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           { email: 'admin@aston.com', name: 'Admin Luggage', role: 'admin' as const },
           { email: 'staff@aston.com', name: 'Staff Luggage', role: 'staff' as const }
         ];
-        const matchingDefault = defaultUsers.find(u => u.email === email.trim().toLowerCase());
-        if (matchingDefault) {
+        const matchingDefault = defaultUsers.find(u => u.email === userEmail.toLowerCase());
+        if (matchingDefault || isITM) {
+          const finalRole = isITM ? 'admin' : (matchingDefault?.role || 'staff');
+          const finalName = isITM ? 'IT Manager ASTON' : (matchingDefault?.name || 'Staff');
           try {
             await setDoc(userDocRef, {
               uid,
-              email: matchingDefault.email,
-              name: matchingDefault.name,
-              role: matchingDefault.role,
+              email: userEmail.toLowerCase(),
+              name: finalName,
+              role: finalRole,
+              approved: true, // Seed defaults or ITM are approved
               createdAt: new Date().toISOString()
             });
             onLoginSuccess({
               uid,
-              email: matchingDefault.email,
-              name: matchingDefault.name,
-              role: matchingDefault.role
+              email: userEmail.toLowerCase(),
+              name: finalName,
+              role: finalRole
             });
             return;
           } catch (createErr: any) {
@@ -393,122 +451,6 @@ export default function Login({ onLoginSuccess }: LoginProps) {
               </div>
             </form>
           )}
-
-          {/* Quick-fill section to ease previewing */}
-          <div className="mt-8 pt-6 border-t border-slate-100">
-            <div className="flex items-center justify-between mb-3 text-slate-400 text-[10px] uppercase font-bold tracking-wider">
-              <span>Akun Demo ASTON</span>
-              {isSeeding && (
-                <span className="flex items-center gap-1 text-amber-500">
-                  <RefreshCw className="w-3 h-3 animate-spin" /> Initializing...
-                </span>
-              )}
-            </div>
-            
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickFill('ITM@astoncirebon.com')}
-                className="p-2 text-left bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-100 transition-colors cursor-pointer"
-              >
-                <div className="text-[10px] font-bold text-slate-700">Admin (ITM)</div>
-                <div className="text-[9px] text-slate-400 truncate">ITM@astoncirebon.com</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickFill('staff@aston.com')}
-                className="p-2 text-left bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-100 transition-colors cursor-pointer"
-              >
-                <div className="text-[10px] font-bold text-slate-700">Staff</div>
-                <div className="text-[9px] text-slate-400 truncate">staff@aston.com</div>
-              </button>
-            </div>
-            <div className="text-[10px] text-slate-400 text-center mt-3 italic flex flex-col items-center gap-1.5">
-              <div>
-                Password default semua akun: <strong className="text-slate-600 font-mono text-[11px]">aston123</strong>
-              </div>
-              <button
-                type="button"
-                onClick={async () => {
-                  if (window.confirm("Apakah Anda yakin ingin mengatur ulang data otorisasi & akun demo bawaan?")) {
-                    setIsSeeding(true);
-                    setError(null);
-                    setInfoMessage(null);
-                    const res = await seedInitialUsers(true);
-                    if (res.success) {
-                      setInfoMessage("Berhasil mengatur ulang dan meregistrasi ulang akun bawaan!");
-                    } else {
-                      setError(`Gagal reset data: ${res.error}`);
-                    }
-                    setIsSeeding(false);
-                  }
-                }}
-                className="mt-1 text-[9px] text-[#002B5B] hover:text-[#114488] font-bold underline cursor-pointer hover:no-underline transition-all"
-                disabled={isSeeding}
-              >
-                {isSeeding ? "Mengatur ulang data..." : "Reset & Registrasi Ulang Akun Bawaan"}
-              </button>
-            </div>
-          </div>
-
-          {/* Collapsible Setup Guide */}
-          <div className="mt-4 pt-4 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={() => setShowGuide(!showGuide)}
-              className="w-full flex items-center justify-between text-[#002B5B] hover:text-[#114488] text-[11px] font-bold uppercase tracking-wider cursor-pointer transition-colors"
-            >
-              <span className="flex items-center gap-1.5">
-                <HelpCircle className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
-                Panduan Setup Google Console & Firebase
-              </span>
-              {showGuide ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
-            </button>
-
-            {showGuide && (
-              <div className="mt-3 bg-slate-50 border border-slate-150 rounded-xl p-4 text-[11px] text-slate-600 space-y-3.5 animate-fade-in max-h-[250px] overflow-y-auto">
-                <div className="flex gap-2">
-                  <div className="w-5 h-5 shrink-0 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-[10px]">
-                    1
-                  </div>
-                  <div>
-                    <strong className="text-slate-800 block mb-0.5">Aktifkan Google Auth di Firebase</strong>
-                    Buka tab <strong className="text-slate-700">Authentication</strong> di Firebase Console, pilih <strong className="text-slate-700">Sign-in method</strong>, klik <strong className="text-slate-700">Add new provider</strong>, pilih <strong className="text-slate-700">Google</strong>, aktifkan, isi kolom email dukungan, dan simpan.
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <div className="w-5 h-5 shrink-0 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-[10px]">
-                    2
-                  </div>
-                  <div>
-                    <strong className="text-slate-800 block mb-0.5">Daftarkan Authorized Domains</strong>
-                    Di Firebase Console &rarr; <strong className="text-slate-700">Authentication</strong> &rarr; <strong className="text-slate-700">Settings</strong> &rarr; <strong className="text-slate-700">Authorized domains</strong>, tambahkan domain ini agar diizinkan oleh Firebase Auth:
-                    <div className="mt-1 bg-slate-200/60 font-mono text-[9px] px-2 py-1 rounded text-slate-800 select-all font-semibold">
-                      {window.location.hostname}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <div className="w-5 h-5 shrink-0 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-[10px]">
-                    3
-                  </div>
-                  <div>
-                    <strong className="text-slate-800 block mb-0.5">Konfigurasi di Google Cloud Console</strong>
-                    Buka Google Cloud Console (<a href="https://console.cloud.google.com" target="_blank" rel="noreferrer" className="text-blue-600 underline hover:text-blue-800">console.cloud.google.com</a>) untuk proyek Anda. Pergi ke <strong className="text-slate-700">APIs & Services</strong> &rarr; <strong className="text-slate-700">Credentials</strong>, lalu di bagian <strong className="text-slate-700">OAuth 2.0 Client IDs</strong> edit klien web utama Anda.
-                    <div className="mt-1">
-                      Tambahkan URL origin berikut ke kolom <strong className="text-slate-700">Authorized JavaScript origins</strong>:
-                    </div>
-                    <div className="mt-1 bg-slate-200/60 font-mono text-[9px] px-2 py-1 rounded text-slate-800 select-all font-semibold break-all">
-                      {window.location.origin}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </div>

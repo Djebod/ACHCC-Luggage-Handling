@@ -3,6 +3,7 @@ export interface AppUser {
   email: string;
   name: string;
   role: 'admin' | 'staff';
+  approved?: boolean;
   createdAt: string;
 }
 

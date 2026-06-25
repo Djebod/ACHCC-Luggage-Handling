@@ -74,6 +74,7 @@ export default function UserManagement() {
         email: email.trim(),
         name: name.trim(),
         role,
+        approved: true, // Manually created users are approved by default
         createdAt: new Date().toISOString()
       };
 
@@ -99,6 +100,23 @@ export default function UserManagement() {
       }
     } finally {
       setIsAdding(false);
+    }
+  };
+
+  const handleToggleApproval = async (user: AppUser) => {
+    try {
+      setError(null);
+      setSuccess(null);
+      const userDocRef = doc(db, 'users', user.uid);
+      const newApprovalStatus = !user.approved;
+      
+      await setDoc(userDocRef, { approved: newApprovalStatus }, { merge: true });
+      
+      setSuccess(`Status persetujuan user "${user.name}" berhasil diubah menjadi ${newApprovalStatus ? 'DISETUJUI' : 'MENUNGGU PERSETUJUAN'}.`);
+      fetchUsers();
+    } catch (err: any) {
+      console.error('Error toggling user approval:', err);
+      setError(`Gagal mengubah status persetujuan: ${err.message}`);
     }
   };
 
@@ -286,6 +304,7 @@ export default function UserManagement() {
                   <tr className="bg-slate-50 text-slate-500 border-b border-slate-100">
                     <th className="py-3 px-4 font-bold uppercase">Nama / Email</th>
                     <th className="py-3 px-4 font-bold uppercase">Role</th>
+                    <th className="py-3 px-4 font-bold uppercase">Persetujuan</th>
                     <th className="py-3 px-4 font-bold uppercase text-right">Aksi</th>
                   </tr>
                 </thead>
@@ -293,7 +312,12 @@ export default function UserManagement() {
                   {users.map((user) => (
                     <tr key={user.uid} className="hover:bg-slate-50/50 transition-colors">
                        <td className="py-3 px-4">
-                        <div className="font-semibold text-slate-800">{user.name}</div>
+                        <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                          {user.name}
+                          {user.email.toLowerCase() === 'itm@astoncirebon.com' && (
+                            <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 text-[9px] rounded font-bold uppercase">ITM</span>
+                          )}
+                        </div>
                         <div className="text-slate-400 text-[11px] font-mono">{user.email}</div>
                       </td>
                       <td className="py-3 px-4">
@@ -306,14 +330,46 @@ export default function UserManagement() {
                           {user.role}
                         </span>
                       </td>
+                      <td className="py-3 px-4">
+                        {user.role === 'admin' || user.email.toLowerCase() === 'itm@astoncirebon.com' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-800 border border-green-200/50 rounded-full text-[9px] font-bold uppercase tracking-wider">
+                            <CheckCircle2 className="w-2.5 h-2.5" />
+                            Selalu Aktif
+                          </span>
+                        ) : (
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
+                            user.approved
+                              ? 'bg-green-100 text-green-800 border border-green-200/50'
+                              : 'bg-yellow-50 text-yellow-700 border border-yellow-200/50'
+                          }`}>
+                            {user.approved ? <CheckCircle2 className="w-2.5 h-2.5" /> : <AlertTriangle className="w-2.5 h-2.5" />}
+                            {user.approved ? 'Disetujui' : 'Tertunda'}
+                          </span>
+                        )}
+                      </td>
                       <td className="py-3 px-4 text-right">
-                        <button
-                          onClick={() => handleDeleteUser(user.uid, user.name)}
-                          className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer inline-flex items-center"
-                          title="Hapus user"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center justify-end gap-2.5">
+                          {user.role !== 'admin' && user.email.toLowerCase() !== 'itm@astoncirebon.com' && (
+                            <button
+                              onClick={() => handleToggleApproval(user)}
+                              className={`px-2 py-1 text-[10px] font-bold rounded-lg border transition-all active:scale-[0.97] cursor-pointer ${
+                                user.approved
+                                  ? 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100'
+                                  : 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
+                              }`}
+                            >
+                              {user.approved ? 'Tolak Akses' : 'Setujui Akses'}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDeleteUser(user.uid, user.name)}
+                            disabled={user.email.toLowerCase() === 'itm@astoncirebon.com'}
+                            className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer inline-flex items-center disabled:opacity-30 disabled:pointer-events-none"
+                            title="Hapus user"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
