@@ -15,7 +15,7 @@ import { seedInitialUsers } from '../utils/seed';
 import { KeyRound, Mail, ShieldAlert, Loader2, RefreshCw, ChevronDown, ChevronUp, Globe, Info, HelpCircle } from 'lucide-react';
 
 interface LoginProps {
-  onLoginSuccess: (user: { uid: string; email: string; name: string; role: 'admin' | 'staff' }) => void;
+  onLoginSuccess: (user: { uid: string; email: string; name: string; role: 'admin' | 'staff'; approved?: boolean }) => void;
 }
 
 export default function Login({ onLoginSuccess }: LoginProps) {
@@ -63,19 +63,12 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           }
         }
 
-        // System rejects login when user is not approved and is not an admin
-        if (approved !== true && role !== 'admin') {
-          await auth.signOut();
-          setError('Akun Anda belum disetujui oleh Admin. Silakan hubungi Admin untuk mendapatkan persetujuan masuk.');
-          setIsLoading(false);
-          return;
-        }
-
         onLoginSuccess({
           uid,
           email: userData.email || email,
           name: userData.name || name,
-          role: role
+          role: role,
+          approved: approved
         });
       } else {
         // Automatically register
@@ -92,19 +85,13 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         };
         
         await setDoc(userDocRef, newUserProfile);
-        
-        if (approved !== true && role !== 'admin') {
-          await auth.signOut();
-          setError('Registrasi berhasil! Akun Anda (Staff) sedang menunggu persetujuan Admin sebelum dapat masuk.');
-          setIsLoading(false);
-          return;
-        }
 
         onLoginSuccess({
           uid,
           email,
           name,
-          role
+          role,
+          approved
         });
       }
     } catch (err: any) {
@@ -177,19 +164,12 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           }
         }
 
-        // System rejects login when user is not approved and is not an admin
-        if (approved !== true && role !== 'admin') {
-          await auth.signOut();
-          setError('Akun Anda belum disetujui oleh Admin. Silakan hubungi Admin untuk mendapatkan persetujuan masuk.');
-          setIsLoading(false);
-          return;
-        }
-
         onLoginSuccess({
           uid,
           email: userData.email || userEmail,
           name: userData.name,
-          role: role
+          role: role,
+          approved: approved
         });
       } else {
         // Automatically check if this is one of our default seed accounts
@@ -215,7 +195,8 @@ export default function Login({ onLoginSuccess }: LoginProps) {
               uid,
               email: userEmail.toLowerCase(),
               name: finalName,
-              role: finalRole
+              role: finalRole,
+              approved: true
             });
             return;
           } catch (createErr: any) {

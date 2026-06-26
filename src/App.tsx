@@ -22,11 +22,12 @@ import {
   CheckCircle, 
   AlertTriangle,
   Info,
-  ExternalLink
+  ExternalLink,
+  Lock
 } from 'lucide-react';
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState<{ uid: string; email: string; name: string; role: 'admin' | 'staff' } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ uid: string; email: string; name: string; role: 'admin' | 'staff'; approved?: boolean } | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'input' | 'scan' | 'users' | 'settings'>('dashboard');
   
@@ -50,7 +51,8 @@ export default function App() {
               uid: firebaseUser.uid,
               email: userData.email,
               name: userData.name,
-              role: userData.role as 'admin' | 'staff'
+              role: userData.role as 'admin' | 'staff',
+              approved: userData.approved
             });
           } else {
             // Profile document missing or deleted, sign them out
@@ -123,6 +125,64 @@ export default function App() {
           setActiveTab('dashboard');
         }} 
       />
+    );
+  }
+
+  // Show access pending screen if authenticated but not approved and not admin
+  if (currentUser && currentUser.approved !== true && currentUser.role !== 'admin') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F1F3F6] p-4 font-sans relative overflow-hidden">
+        {/* Subtle decorative circles */}
+        <div className="absolute top-0 left-0 w-96 h-96 bg-purple-400/5 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-400/5 rounded-full blur-3xl translate-x-1/2 translate-y-1/2"></div>
+ 
+        <div className="w-full max-w-lg bg-white rounded-[32px] shadow-[0_8px_30px_rgb(0,0,0,0.06)] p-10 border border-slate-100 relative z-10 flex flex-col items-center">
+          {/* Lock Icon Box with light purple/gray rounded square */}
+          <div className="flex justify-center mb-8">
+            <div className="p-6 bg-[#F3F4F6] rounded-[24px] text-[#A78BFA] flex items-center justify-center">
+              <Lock className="w-8 h-8" strokeWidth={1.5} />
+            </div>
+          </div>
+
+          {/* Heading: Access Pending */}
+          <h2 className="text-[28px] font-black text-[#1E293B] text-center tracking-tight mb-2">Access Pending</h2>
+          
+          {/* Welcome: Welcome, Syam Shugi Rakhmany! */}
+          <p className="text-[#64748B] text-base text-center mb-4">
+            Welcome, <span className="font-extrabold text-[#475569]">{currentUser.name}</span>!
+          </p>
+
+          {/* Description */}
+          <p className="text-[#94A3B8] text-xs text-center leading-relaxed max-w-[340px] mx-auto mb-8 font-medium">
+            Your account ({currentUser.email}) has been created, but you don't have role access yet.
+          </p>
+
+          {/* Contact Admin Warning Box */}
+          <div className="bg-[#FEF2F2] border border-[#FEE2E2] rounded-[18px] p-4 mb-8 w-full">
+            <p className="text-[#991B1B] text-xs font-bold text-center leading-relaxed">
+              Please contact your system administrator to get access to the dashboard.
+            </p>
+          </div>
+
+          {/* Logout Button */}
+          <div className="flex justify-center">
+            <button
+              onClick={async () => {
+                try {
+                  await signOut(auth);
+                  setCurrentUser(null);
+                } catch (err) {
+                  console.error('Logout error:', err);
+                }
+              }}
+              className="px-8 py-2.5 bg-[#8B5CF6] hover:bg-[#7C3AED] text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-[0_4px_12px_rgba(139,92,246,0.25)] flex items-center gap-2"
+            >
+              <LogOut className="w-4 h-4" />
+              Logout
+            </button>
+          </div>
+        </div>
+      </div>
     );
   }
 
