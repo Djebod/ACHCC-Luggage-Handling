@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { auth, db, doc, getDoc, signOut } from './firebase';
 import { LuggageItem } from './types';
 import Login from './components/Login';
+import AstonLogo from './components/AstonLogo';
 import Dashboard from './components/Dashboard';
 import LuggageInput from './components/LuggageInput';
 import LuggageScanner from './components/LuggageScanner';
@@ -134,22 +135,18 @@ export default function App() {
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
             
             {/* Logo Brand */}
-            <div className="flex items-center gap-4">
-              <div className="h-11 w-11 bg-[#002B5B] rounded-xl flex items-center justify-center font-serif font-bold text-white text-lg shadow-md border border-blue-900/10">
-                A
-              </div>
+            <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+              <AstonLogo className="w-full max-w-[170px]" variant="color" />
+              <div className="hidden sm:block h-8 w-px bg-slate-200"></div>
               <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-serif uppercase tracking-widest font-bold text-[#002B5B]">
-                    ASTON CIREBON
-                  </span>
+                <div className="flex items-center justify-center sm:justify-start gap-2">
                   <span className="bg-emerald-100 text-emerald-700 text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-tight flex items-center gap-1">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                     Firebase Live
                   </span>
                 </div>
-                <div className="text-sm font-bold tracking-tight text-slate-500 leading-tight">
-                  Luggage & Deposit Management System
+                <div className="text-[11px] font-bold tracking-tight text-slate-400 mt-1 uppercase">
+                  Luggage Management System
                 </div>
               </div>
             </div>

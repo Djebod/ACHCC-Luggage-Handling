@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import AstonLogo from './AstonLogo';
 import { 
   auth, 
   signInWithEmailAndPassword, 
@@ -34,9 +35,8 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
     try {
       const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({
-        prompt: 'select_account'
-      });
+      // Optimization: Do NOT force prompt: 'select_account' so that if the user is already logged in, 
+      // the sign-in succeeds instantly without forcing them to select their account every single time.
       
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
@@ -284,16 +284,11 @@ export default function Login({ onLoginSuccess }: LoginProps) {
  
       <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200/50 relative z-10">
         {/* Banner with Hotel Branding */}
-        <div className="bg-[#002B5B] p-8 text-center border-b-4 border-amber-400 relative">
-          <div className="text-amber-400 font-serif tracking-widest text-xs uppercase font-extrabold mb-1">
-            ASTON CIREBON
+        <div className="bg-white px-8 pt-9 pb-6 text-center border-b border-slate-100 relative flex flex-col items-center">
+          <AstonLogo className="w-full max-w-[220px]" variant="color" />
+          <div className="mt-3.5 px-3 py-1 bg-amber-50 rounded-full border border-amber-200/50 text-[#002B5B] font-bold text-[9px] tracking-wider uppercase">
+            Luggage & Deposit Management
           </div>
-          <h1 className="text-white text-xl font-serif font-bold tracking-tight">
-            Hotel & Convention Center
-          </h1>
-          <p className="text-slate-300 text-xs mt-2 font-light">
-            Sistem Manajemen Penitipan Barang Tamu (Luggage Management)
-          </p>
         </div>
  
         <div className="p-8">
@@ -392,13 +387,22 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                 disabled={isLoading}
                 className="w-full py-3 border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-sm rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none cursor-pointer flex items-center justify-center gap-2.5 bg-white shadow-sm"
               >
-                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v3.9h6.6c-.3 1.53-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.1 3.66-5.18 3.66-8.56z"/>
-                  <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.11 0-5.74-2.11-6.68-4.96H1.21v3.15C3.18 21.88 7.31 24 12 24z"/>
-                  <path fill="#FBBC05" d="M5.32 14.24A7.16 7.16 0 0 1 4.91 12c0-.79.13-1.57.37-2.31V6.54H1.21A11.94 11.94 0 0 0 0 12c0 2.01.5 3.91 1.38 5.61l3.94-3.37z"/>
-                  <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.18 2.12 1.21 5.61l4.11 3.2C6.26 5.86 8.89 4.75 12 4.75z"/>
-                </svg>
-                Masuk / Daftar Staff dengan Google
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-amber-500" />
+                    Menghubungkan Google...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                      <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v3.9h6.6c-.3 1.53-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.1 3.66-5.18 3.66-8.56z"/>
+                      <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.11 0-5.74-2.11-6.68-4.96H1.21v3.15C3.18 21.88 7.31 24 12 24z"/>
+                      <path fill="#FBBC05" d="M5.32 14.24A7.16 7.16 0 0 1 4.91 12c0-.79.13-1.57.37-2.31V6.54H1.21A11.94 11.94 0 0 0 0 12c0 2.01.5 3.91 1.38 5.61l3.94-3.37z"/>
+                      <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.18 2.12 1.21 5.61l4.11 3.2C6.26 5.86 8.89 4.75 12 4.75z"/>
+                    </svg>
+                    Masuk / Daftar Staff dengan Google
+                  </>
+                )}
               </button>
             </form>
           ) : (
