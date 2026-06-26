@@ -25,7 +25,7 @@ interface LuggageInputProps {
 export default function LuggageInput({ currentUser, onSuccess, onPrintRequest }: LuggageInputProps) {
   const [namaTamu, setNamaTamu] = useState('');
   const [roomNumber, setRoomNumber] = useState('');
-  const [typeHandling, setTypeHandling] = useState<'Standard' | 'Fragile' | 'Heavy' | 'High Value'>('Standard');
+  const [typeHandling, setTypeHandling] = useState<'Koper' | 'Kardus' | 'Tas Ransel' | 'Lain Lain'>('Koper');
   const [remark, setRemark] = useState('');
   
   // Photo states
@@ -311,10 +311,10 @@ export default function LuggageInput({ currentUser, onSuccess, onPrintRequest }:
                     onChange={(e: any) => setTypeHandling(e.target.value)}
                     className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-amber-400 focus:bg-white transition-colors font-medium text-slate-800"
                   >
-                    <option value="Standard">Standard Luggage</option>
-                    <option value="Fragile">Fragile (Pecah Belah)</option>
-                    <option value="Heavy">Heavy (Berat)</option>
-                    <option value="High Value">High Value (Berharga)</option>
+                    <option value="Koper">Koper</option>
+                    <option value="Kardus">Kardus</option>
+                    <option value="Tas Ransel">Tas Ransel</option>
+                    <option value="Lain Lain">Lain Lain</option>
                   </select>
                 </div>
               </div>

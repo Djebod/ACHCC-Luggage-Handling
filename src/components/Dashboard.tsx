@@ -325,10 +325,10 @@ export default function Dashboard({ currentUser, onPrintRequest }: DashboardProp
             className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-amber-400 font-medium"
           >
             <option value="All">Semua Handling</option>
-            <option value="Standard">Standard</option>
-            <option value="Fragile">Fragile</option>
-            <option value="Heavy">Heavy</option>
-            <option value="High Value">High Value</option>
+            <option value="Koper">Koper</option>
+            <option value="Kardus">Kardus</option>
+            <option value="Tas Ransel">Tas Ransel</option>
+            <option value="Lain Lain">Lain Lain</option>
           </select>
 
           {/* Sort Order */}
@@ -368,12 +368,12 @@ export default function Dashboard({ currentUser, onPrintRequest }: DashboardProp
               <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                 <div>
                   <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded border ${
-                    item.typeHandling === 'Fragile'
-                      ? 'bg-rose-50 text-rose-700 border-rose-100'
-                      : item.typeHandling === 'Heavy'
+                    item.typeHandling === 'Kardus'
                       ? 'bg-amber-50 text-amber-800 border-amber-200'
-                      : item.typeHandling === 'High Value'
+                      : item.typeHandling === 'Tas Ransel'
                       ? 'bg-purple-50 text-purple-700 border-purple-100'
+                      : item.typeHandling === 'Lain Lain'
+                      ? 'bg-slate-50 text-slate-700 border-slate-200'
                       : 'bg-blue-50 text-blue-700 border-blue-100'
                   }`}>
                     {item.typeHandling}

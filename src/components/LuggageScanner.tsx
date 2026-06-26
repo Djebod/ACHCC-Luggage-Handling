@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import { Html5Qrcode } from 'html5-qrcode';
 import { db, doc, getDoc, updateDoc } from '../firebase';
+import { collection, getDocs } from 'firebase/firestore';
 import { LuggageItem } from '../types';
 import { syncToGoogleSheet } from '../utils/sheetSync';
 import { 
@@ -26,12 +27,14 @@ interface LuggageScannerProps {
 export default function LuggageScanner({ currentUser, onStatusUpdated }: LuggageScannerProps) {
   const [manualId, setManualId] = useState('');
   const [scannedItem, setScannedItem] = useState<LuggageItem | null>(null);
+  const [searchResults, setSearchResults] = useState<LuggageItem[]>([]);
+  const [isLoadingSearch, setIsLoadingSearch] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [isProcessingDelivery, setIsProcessingDelivery] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
 
   // Stop scanning on unmount
   useEffect(() => {
@@ -49,74 +52,110 @@ export default function LuggageScanner({ currentUser, onStatusUpdated }: Luggage
     // Wait for the container element to render in DOM
     setTimeout(() => {
       try {
-        const scanner = new Html5QrcodeScanner(
-          'qr-scanner-view',
-          { 
-            fps: 10, 
-            qrbox: { width: 250, height: 250 },
-            rememberLastUsedCamera: true
-          },
-          /* verbose= */ false
-        );
+        const scanner = new Html5Qrcode('qr-scanner-view');
         scannerRef.current = scanner;
 
-        scanner.render(
+        scanner.start(
+          { facingMode: 'environment' },
+          { 
+            fps: 10, 
+            qrbox: { width: 250, height: 250 }
+          },
           async (decodedText) => {
             console.log('Scanned QR code:', decodedText);
             // Vibrate device if supported
             if (navigator.vibrate) navigator.vibrate(100);
             
             // Stop scanning and lookup ID
-            scanner.clear();
+            try {
+              await scanner.stop();
+            } catch (err) {
+              console.error('Error stopping scanner on success:', err);
+            }
+            scannerRef.current = null;
             setIsScanning(false);
             await lookupLuggageItem(decodedText.trim());
           },
-          (error) => {
+          (errorMessage) => {
             // Silence common scanning noise errors
           }
-        );
+        ).catch((err) => {
+          console.error('Failed to start html5-qrcode camera:', err);
+          setSearchError('Gagal menyalakan kamera. Pastikan Anda memberikan izin akses kamera pada browser Anda.');
+          setIsScanning(false);
+          scannerRef.current = null;
+        });
       } catch (err) {
-        console.error('Failed to initialize html5-qrcode scanner:', err);
+        console.error('Failed to initialize html5-qrcode:', err);
         setSearchError('Gagal menyalakan scanner. Periksa izin kamera browser Anda.');
         setIsScanning(false);
       }
     }, 100);
   };
 
-  const stopScanner = () => {
+  const stopScanner = async () => {
     if (scannerRef.current) {
       try {
-        scannerRef.current.clear();
+        await scannerRef.current.stop();
       } catch (err) {
-        console.error('Error clearing scanner:', err);
+        console.error('Error stopping scanner:', err);
       }
       scannerRef.current = null;
     }
     setIsScanning(false);
   };
 
-  const lookupLuggageItem = async (id: string) => {
+  const lookupLuggageItem = async (queryStr: string) => {
     setSearchError(null);
     setSuccessMessage(null);
     setScannedItem(null);
+    setSearchResults([]);
 
-    if (!id) {
-      setSearchError('Masukkan ID penitipan barang.');
+    if (!queryStr) {
+      setSearchError('Masukkan ID penitipan barang atau nama tamu.');
       return;
     }
 
+    setIsLoadingSearch(true);
+    const trimmedQuery = queryStr.trim();
+
     try {
-      const docRef = doc(db, 'luggage', id);
+      // 1. Cek kecocokan ID secara langsung di Firestore terlebih dahulu
+      const docRef = doc(db, 'luggage', trimmedQuery);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
         setScannedItem(docSnap.data() as LuggageItem);
+        setIsLoadingSearch(false);
+        return;
+      }
+
+      // 2. Jika tidak ditemukan kecocokan ID persis, lakukan pencarian berdasarkan Nama Tamu, ID, atau No Kamar (case-insensitive)
+      const querySnapshot = await getDocs(collection(db, 'luggage'));
+      const allItems: LuggageItem[] = [];
+      querySnapshot.forEach((docSnap) => {
+        allItems.push(docSnap.data() as LuggageItem);
+      });
+
+      const searchLower = trimmedQuery.toLowerCase();
+      const matches = allItems.filter(item => 
+        (item.id && item.id.toLowerCase().includes(searchLower)) ||
+        (item.namaTamu && item.namaTamu.toLowerCase().includes(searchLower)) ||
+        (item.roomNumber && item.roomNumber.toLowerCase().includes(searchLower))
+      );
+
+      if (matches.length === 1) {
+        setScannedItem(matches[0]);
+      } else if (matches.length > 1) {
+        setSearchResults(matches);
       } else {
-        setSearchError(`Data barang dengan ID "${id}" tidak ditemukan.`);
+        setSearchError(`Data barang dengan kata kunci "${trimmedQuery}" tidak ditemukan.`);
       }
     } catch (err: any) {
       console.error('Error looking up luggage:', err);
       setSearchError(`Gagal mencari data: ${err.message}`);
+    } finally {
+      setIsLoadingSearch(false);
     }
   };
 
@@ -239,25 +278,84 @@ export default function LuggageScanner({ currentUser, onStatusUpdated }: Luggage
           <form onSubmit={handleManualSearch} className="p-8 border border-slate-200 bg-slate-50/50 rounded-2xl flex flex-col justify-center space-y-4">
             <div>
               <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Cari Secara Manual</h3>
-              <p className="text-[10px] text-slate-400">Masukkan ID penitipan apabila kamera bermasalah</p>
+              <p className="text-[10px] text-slate-400">Masukkan ID penitipan atau nama tamu apabila kamera bermasalah</p>
             </div>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={manualId}
                 onChange={(e) => setManualId(e.target.value)}
-                placeholder="E.g. ASTON-20260624-XXXX"
-                className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-amber-400 font-mono font-bold"
+                placeholder="E.g. ASTON-XXXX atau Nama Tamu"
+                className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-amber-400 font-medium text-slate-800"
               />
               <button
                 type="submit"
-                className="px-4 py-2 bg-[#002B5B] hover:bg-blue-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors shadow cursor-pointer"
+                disabled={isLoadingSearch}
+                className="px-4 py-2 bg-[#002B5B] hover:bg-blue-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors shadow cursor-pointer disabled:opacity-50"
               >
-                <Search className="w-4 h-4" />
+                {isLoadingSearch ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Search className="w-4 h-4" />
+                )}
                 Cari
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Multiple Search Results list */}
+      {searchResults.length > 0 && !scannedItem && (
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4">
+          <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+            <div>
+              <h3 className="text-xs font-bold text-[#002B5B] uppercase tracking-wider">Hasil Pencarian ({searchResults.length})</h3>
+              <p className="text-[10px] text-slate-500">Ditemukan beberapa data yang cocok. Pilih salah satu di bawah:</p>
+            </div>
+            <button 
+              onClick={() => setSearchResults([])}
+              className="text-[10px] text-[#002B5B] hover:text-amber-500 font-bold"
+            >
+              Reset
+            </button>
+          </div>
+          <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
+            {searchResults.map((item) => (
+              <div 
+                key={item.id}
+                className="p-3 bg-white border border-slate-200/80 rounded-xl hover:border-amber-400 hover:shadow-sm transition-all flex items-center justify-between gap-4"
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold font-mono text-slate-800">{item.id}</span>
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                      item.status === 'Gudang' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                    }`}>
+                      {item.status}
+                    </span>
+                  </div>
+                  <div className="text-xs font-medium text-slate-600 flex items-center gap-1">
+                    <User className="w-3 h-3 text-slate-400" />
+                    {item.namaTamu} (Rm {item.roomNumber || '-'})
+                  </div>
+                  <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                    {item.date} {item.time} &bull; {item.typeHandling}
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setScannedItem(item);
+                    setSearchResults([]);
+                  }}
+                  className="px-3 py-1.5 bg-[#002B5B] hover:bg-amber-400 hover:text-slate-900 text-white rounded-lg text-xs font-bold transition-all"
+                >
+                  Pilih
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

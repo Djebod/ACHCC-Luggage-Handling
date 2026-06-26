@@ -11,7 +11,16 @@ service cloud.firestore {
     }
     
     function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'admin';
+      return isSignedIn() && (
+        (request.auth.token.email != null && (
+          request.auth.token.email == 'itm@astoncirebon.com' ||
+          request.auth.token.email == 'ITM@astoncirebon.com' ||
+          request.auth.token.email == 'admin@aston.com'
+        )) || (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        )
+      );
     }
 
     // 1. system collection

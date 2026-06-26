@@ -21,7 +21,7 @@
         "id": { "type": "string" },
         "namaTamu": { "type": "string" },
         "roomNumber": { "type": "string" },
-        "typeHandling": { "type": "string", "enum": ["Standard", "Fragile", "Heavy", "High Value"] },
+        "typeHandling": { "type": "string", "enum": ["Koper", "Kardus", "Tas Ransel", "Lain Lain"] },
         "remark": { "type": "string" },
         "status": { "type": "string", "enum": ["Gudang", "Sudah Diambil"] },
         "photo": { "type": "string" },

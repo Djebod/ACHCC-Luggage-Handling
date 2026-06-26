@@ -13,7 +13,7 @@ export interface LuggageItem {
   time: string; // TIME (HH:MM)
   qrCode: string; // QR CODE content
   receiveBy: string; // RECEIVE BY (Staff Name)
-  typeHandling: 'Standard' | 'Fragile' | 'Heavy' | 'High Value'; // TYPE HANDLING
+  typeHandling: 'Koper' | 'Kardus' | 'Tas Ransel' | 'Lain Lain'; // TYPE HANDLING
   namaTamu: string; // NAMA TAMU
   photo: string; // PHOTO (Base64 Data URL)
   remark: string; // REMARK
