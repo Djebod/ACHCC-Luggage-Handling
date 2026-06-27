@@ -1,5 +1,5 @@
 {
-  "name": "ASTON Cirebon Luggage Management",
+  "name": "Aston Cirebon Official Luggage & Item Handling Apps",
   "description": "Aplikasi Manajemen Penitipan Barang ASTON Cirebon Hotel & Convention Center",
   "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

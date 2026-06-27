@@ -16,7 +16,8 @@ import {
   ExternalLink,
   Phone,
   Calendar,
-  AlertCircle
+  AlertCircle,
+  Camera
 } from 'lucide-react';
 
 interface PublicDepositsListProps {
@@ -38,6 +39,11 @@ export default function PublicDepositsList({ currentUser }: PublicDepositsListPr
   const [checkoutConfirmItem, setCheckoutConfirmItem] = useState<PublicDepositItem | null>(null);
   const [deleteConfirmItem, setDeleteConfirmItem] = useState<PublicDepositItem | null>(null);
   const [printTarget, setPrintTarget] = useState<PublicDepositItem | null>(null);
+
+  // Handover/Checkout additional inputs
+  const [namaPenerimaAmbil, setNamaPenerimaAmbil] = useState('');
+  const [catatanAmbil, setCatatanAmbil] = useState('');
+  const [photoAmbil, setPhotoAmbil] = useState<string>('');
 
   // Real-time listener for Firestore public_deposits collection
   useEffect(() => {
@@ -84,18 +90,49 @@ export default function PublicDepositsList({ currentUser }: PublicDepositsListPr
     setFilteredItems(result);
   }, [items, searchQuery, statusFilter, jenisFilter]);
 
+  const handlePhotoAmbilUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert('Ukuran foto terlalu besar. Maksimal 2MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setPhotoAmbil(event.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleCheckout = async (item: PublicDepositItem) => {
+    if (!namaPenerimaAmbil.trim()) {
+      alert('Nama penerima wajib diisi.');
+      return;
+    }
+
     try {
       const now = new Date();
-      const localDate = now.toLocaleDateString('id-ID', { year: 'numeric', month: '2-digit', day: '2-digit' }).split('/').reverse().join('-');
-      const localTime = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+
+      const localDate = `${year}-${month}-${day}`;
+      const localTime = `${hours}:${minutes}`;
 
       const itemRef = doc(db, 'public_deposits', item.id);
       await updateDoc(itemRef, {
         status: 'Sudah Diambil',
         handledBy: currentUser.name,
         dateDelivered: localDate,
-        timeDelivered: localTime
+        timeDelivered: localTime,
+        namaPenerimaAmbil: namaPenerimaAmbil.trim(),
+        catatanAmbil: catatanAmbil.trim() || '',
+        photoAmbil: photoAmbil || ''
       });
 
       setCheckoutConfirmItem(null);
@@ -358,10 +395,29 @@ export default function PublicDepositsList({ currentUser }: PublicDepositsListPr
 
                 {/* Return metadata log */}
                 {item.status === 'Sudah Diambil' && item.handledBy && (
-                  <div className="mt-3 p-2 bg-emerald-50/50 border border-emerald-100/80 rounded-xl text-[10px] text-emerald-800 space-y-0.5">
-                    <p className="font-bold">✓ Sudah Diserahkan</p>
-                    <p>Diserahkan oleh: <span className="font-semibold">{item.handledBy}</span></p>
-                    <p>Waktu Penyerahan: <span className="font-semibold">{item.dateDelivered} {item.timeDelivered}</span></p>
+                  <div className="mt-3 p-3 bg-emerald-50/50 border border-emerald-100/80 rounded-xl text-[10px] text-emerald-800 space-y-2">
+                    <div className="space-y-0.5">
+                      <p className="font-bold text-xs">✓ Sudah Diserahkan</p>
+                      <p>Diserahkan oleh: <span className="font-semibold">{item.handledBy}</span></p>
+                      <p>Waktu Penyerahan: <span className="font-semibold">{item.dateDelivered} {item.timeDelivered}</span></p>
+                      {item.namaPenerimaAmbil && (
+                        <p>Diterima oleh: <span className="font-bold">{item.namaPenerimaAmbil}</span></p>
+                      )}
+                      {item.catatanAmbil && (
+                        <p className="italic text-slate-600 pt-0.5"><span className="font-semibold not-italic text-emerald-800">Catatan:</span> {item.catatanAmbil}</p>
+                      )}
+                    </div>
+                    {item.photoAmbil && (
+                      <div className="mt-2 pt-2 border-t border-emerald-100/80">
+                        <span className="font-bold block mb-1 text-[9px] uppercase tracking-wider text-emerald-700">Foto Bukti Penyerahan:</span>
+                        <div 
+                          onClick={() => setActivePhoto(item.photoAmbil)}
+                          className="relative rounded-lg overflow-hidden h-14 w-14 bg-slate-100 border border-emerald-200 cursor-pointer hover:opacity-90 inline-block"
+                        >
+                          <img src={item.photoAmbil} alt="Bukti Penyerahan" className="w-full h-full object-cover" />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -389,7 +445,12 @@ export default function PublicDepositsList({ currentUser }: PublicDepositsListPr
 
                   {item.status === 'Menunggu' && (
                     <button
-                      onClick={() => setCheckoutConfirmItem(item)}
+                      onClick={() => {
+                        setCheckoutConfirmItem(item);
+                        setNamaPenerimaAmbil(item.namaPenerima || '');
+                        setCatatanAmbil('');
+                        setPhotoAmbil('');
+                      }}
                       className="px-3.5 py-1.5 bg-[#002B5B] hover:bg-[#114488] text-white text-[10px] font-extrabold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
                     >
                       <CheckCircle className="w-3 h-3" />
@@ -423,25 +484,97 @@ export default function PublicDepositsList({ currentUser }: PublicDepositsListPr
 
       {/* CHECKOUT CONFIRM MODAL */}
       {checkoutConfirmItem && (
-        <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-xl border border-slate-100">
-            <div className="text-center space-y-2">
-              <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-500 mx-auto flex items-center justify-center">
+        <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-xl border border-slate-100 my-8">
+            <div className="text-center space-y-1">
+              <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-500 mx-auto flex items-center justify-center mb-1">
                 <CheckCircle className="w-6 h-6" />
               </div>
-              <h3 className="font-serif font-black text-lg text-slate-800">Penyerahan Barang</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Apakah Anda yakin ingin menyerahkan barang ini kepada <strong className="font-semibold text-slate-800">{checkoutConfirmItem.namaPenerima}</strong>?
+              <h3 className="font-serif font-black text-lg text-slate-800">Proses Penyerahan Publik</h3>
+              <p className="text-xs text-slate-500">
+                Silakan lengkapi data penyerahan barang berikut
               </p>
             </div>
 
-            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-[11px] text-slate-600 space-y-1">
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-[11px] text-slate-600 grid grid-cols-2 gap-2">
               <p><strong>ID:</strong> {checkoutConfirmItem.id}</p>
               <p><strong>Jenis:</strong> {checkoutConfirmItem.jenisBarang}</p>
-              <p><strong>Pengirim:</strong> {checkoutConfirmItem.namaPengirim}</p>
+              <p className="col-span-2"><strong>Pengirim:</strong> {checkoutConfirmItem.namaPengirim}</p>
+              <p className="col-span-2"><strong>Penerima Terdaftar:</strong> {checkoutConfirmItem.namaPenerima}</p>
             </div>
 
-            <div className="flex gap-2">
+            <div className="space-y-3">
+              {/* Nama Penerima */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-extrabold text-slate-600 block uppercase tracking-wider">
+                  Nama Penerima <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Masukkan nama orang yang mengambil barang..."
+                  value={namaPenerimaAmbil}
+                  onChange={(e) => setNamaPenerimaAmbil(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-[#002B5B] focus:bg-white transition-all"
+                />
+              </div>
+
+              {/* Notes */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-extrabold text-slate-600 block uppercase tracking-wider">
+                  Notes / Catatan <span className="text-slate-400 font-normal">(jika diperlukan)</span>
+                </label>
+                <textarea
+                  placeholder="Catatan tambahan penyerahan..."
+                  value={catatanAmbil}
+                  onChange={(e) => setCatatanAmbil(e.target.value)}
+                  rows={2}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-[#002B5B] focus:bg-white transition-all resize-none"
+                />
+              </div>
+
+              {/* Photo Upload / Capture */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-extrabold text-slate-600 block uppercase tracking-wider">
+                  Photo Bukti Penyerahan <span className="text-slate-400 font-normal">(opsional)</span>
+                </label>
+                
+                <div className="flex items-center gap-3">
+                  {photoAmbil ? (
+                    <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-200">
+                      <img src={photoAmbil} alt="Ambil Bukti" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setPhotoAmbil('')}
+                        className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-[9px] font-extrabold opacity-0 hover:opacity-100 transition-opacity cursor-pointer"
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-16 h-16 rounded-xl bg-slate-50 border border-dashed border-slate-200 flex items-center justify-center text-slate-400">
+                      <Camera className="w-5 h-5" />
+                    </div>
+                  )}
+
+                  <div className="flex-1">
+                    <label className="inline-flex items-center justify-center px-3 py-2 border border-slate-200 hover:border-[#002B5B] text-slate-700 hover:text-[#002B5B] bg-white hover:bg-slate-50 rounded-xl text-xs font-bold transition-all cursor-pointer gap-1.5 shadow-sm">
+                      <Camera className="w-3.5 h-3.5" />
+                      {photoAmbil ? 'Ubah Foto' : 'Ambil Foto / Upload'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handlePhotoAmbilUpload}
+                        className="hidden"
+                      />
+                    </label>
+                    <p className="text-[9px] text-slate-400 mt-1 font-semibold">Mendukung kamera langsung di mobile / upload file.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => setCheckoutConfirmItem(null)}

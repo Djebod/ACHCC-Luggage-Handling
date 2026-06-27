@@ -47,5 +47,8 @@ export interface PublicDepositItem {
   handledBy?: string; // staff who returned it
   dateDelivered?: string;
   timeDelivered?: string;
+  namaPenerimaAmbil?: string; // actual receiver/picker name
+  catatanAmbil?: string; // delivery notes
+  photoAmbil?: string; // optional delivery photo
 }
 
