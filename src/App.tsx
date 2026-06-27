@@ -9,6 +9,8 @@ import LuggageScanner from './components/LuggageScanner';
 import UserManagement from './components/UserManagement';
 import SyncSettingsModal from './components/SyncSettingsModal';
 import PrintReceipt from './components/PrintReceipt';
+import PublicDepositForm from './components/PublicDepositForm';
+import PublicDepositsList from './components/PublicDepositsList';
 import { 
   Archive, 
   PlusCircle, 
@@ -23,13 +25,15 @@ import {
   AlertTriangle,
   Info,
   ExternalLink,
-  Lock
+  Lock,
+  ShoppingBag
 } from 'lucide-react';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<{ uid: string; email: string; name: string; role: 'admin' | 'staff'; approved?: boolean } | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'input' | 'scan' | 'users' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'input' | 'scan' | 'users' | 'settings' | 'public_deposits'>('dashboard');
+  const [isViewingPublicForm, setIsViewingPublicForm] = useState(false);
   
   // State for printable ticket data
   const [printTarget, setPrintTarget] = useState<LuggageItem | null>(null);
@@ -116,14 +120,22 @@ export default function App() {
     );
   }
 
-  // Show login screen if not authenticated
+  // Show login or public form screen if not authenticated
   if (!currentUser) {
+    if (isViewingPublicForm) {
+      return (
+        <PublicDepositForm 
+          onBackToLogin={() => setIsViewingPublicForm(false)} 
+        />
+      );
+    }
     return (
       <Login 
         onLoginSuccess={(user) => {
           setCurrentUser(user);
           setActiveTab('dashboard');
         }} 
+        onEnterPublicForm={() => setIsViewingPublicForm(true)}
       />
     );
   }
@@ -291,6 +303,18 @@ export default function App() {
               Scan Checkout
             </button>
 
+            <button
+              onClick={() => setActiveTab('public_deposits')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                activeTab === 'public_deposits'
+                  ? 'bg-amber-400 text-[#002B5B] shadow-md shadow-amber-400/20 font-extrabold'
+                  : 'text-white/80 hover:bg-blue-800/40 hover:text-white'
+              }`}
+            >
+              <ShoppingBag className="w-4 h-4" />
+              Penitipan Publik
+            </button>
+
             {/* Admin-only Navigation tabs */}
             {currentUser.role === 'admin' && (
               <>
@@ -347,6 +371,10 @@ export default function App() {
                 currentUser={currentUser} 
                 onStatusUpdated={() => {}} 
               />
+            )}
+
+            {activeTab === 'public_deposits' && (
+              <PublicDepositsList currentUser={currentUser} />
             )}
 
             {activeTab === 'users' && currentUser.role === 'admin' && (

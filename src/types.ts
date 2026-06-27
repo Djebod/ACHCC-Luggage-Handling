@@ -30,3 +30,22 @@ export interface LuggageItem {
 export interface SyncSettings {
   googleSheetUrl: string;
 }
+
+export interface PublicDepositItem {
+  id: string; // E.g., PUB-YYYYMMDD-XXXX
+  date: string; // Tanggal
+  time: string; // Jam
+  jenisBarang: 'Makanan' | 'Minuman' | 'Barang'; // Jenis barang
+  photo: string; // Base64 Data URL
+  namaPengirim: string; // Nama pengirim
+  noHpPengirim: string; // Nomor Hp pengirim
+  namaPenerima: string; // Nama Penerima
+  keterangan: string; // Keterangan
+  status: 'Menunggu' | 'Sudah Diambil'; // Status
+  createdAt: string; // Internal Timestamp
+  qrCode: string; // QR code
+  handledBy?: string; // staff who returned it
+  dateDelivered?: string;
+  timeDelivered?: string;
+}
+

@@ -54,6 +54,29 @@
         "seeded": { "type": "boolean" }
       },
       "required": ["seeded"]
+    },
+    "PublicDeposit": {
+      "title": "PublicDeposit",
+      "description": "Public deposit items (Food, drink, goods)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "jenisBarang": { "type": "string", "enum": ["Makanan", "Minuman", "Barang"] },
+        "photo": { "type": "string" },
+        "namaPengirim": { "type": "string" },
+        "noHpPengirim": { "type": "string" },
+        "namaPenerima": { "type": "string" },
+        "keterangan": { "type": "string" },
+        "status": { "type": "string", "enum": ["Menunggu", "Sudah Diambil"] },
+        "createdAt": { "type": "string" },
+        "qrCode": { "type": "string" },
+        "handledBy": { "type": "string" },
+        "dateDelivered": { "type": "string" },
+        "timeDelivered": { "type": "string" }
+      },
+      "required": ["id", "date", "time", "jenisBarang", "namaPengirim", "noHpPengirim", "namaPenerima", "status", "createdAt", "qrCode"]
     }
   },
   "firestore": {
@@ -72,6 +95,10 @@
     "settings/sync": {
       "schema": "SyncSettings",
       "description": "Google Sheets syncing settings"
+    },
+    "public_deposits/{depositId}": {
+      "schema": "PublicDeposit",
+      "description": "Public self-service deposit items"
     }
   }
 }

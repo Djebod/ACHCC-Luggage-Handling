@@ -165,8 +165,14 @@ export default function LuggageInput({ currentUser, onSuccess, onPrintRequest }:
     const luggageId = generateLuggageId();
     const now = new Date();
     
-    const localDate = now.toLocaleDateString('id-ID', { year: 'numeric', month: '2-digit', day: '2-digit' }).split('/').reverse().join('-');
-    const localTime = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+
+    const localDate = `${year}-${month}-${day}`;
+    const localTime = `${hours}:${minutes}`;
 
     try {
       // 1. Generate QR Code image data url

@@ -40,6 +40,12 @@ service cloud.firestore {
       allow read, write: if isSignedIn();
     }
 
+    // 5. public_deposits collection
+    match /public_deposits/{depositId} {
+      allow create: if true;
+      allow read, update, delete: if isSignedIn();
+    }
+
     // 4. settings/sync collection
     match /settings/sync {
       allow read, write: if isSignedIn();
