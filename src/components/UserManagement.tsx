@@ -7,10 +7,8 @@ import {
   collection, 
   doc, 
   setDoc, 
-  getDocs, 
   deleteDoc,
-  query,
-  orderBy
+  onSnapshot
 } from '../firebase';
 import { AppUser } from '../types';
 import { UserPlus, Trash2, Shield, User, Loader2, RefreshCw, CheckCircle2, AlertTriangle } from 'lucide-react';
@@ -26,25 +24,31 @@ export default function UserManagement() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const fetchUsers = async () => {
+  useEffect(() => {
     setIsLoading(true);
-    try {
-      const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
-      const querySnapshot = await getDocs(q);
+    // Real-time listener on the users collection
+    const unsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
       const fetchedUsers: AppUser[] = [];
-      querySnapshot.forEach((docSnap) => {
+      snapshot.forEach((docSnap) => {
         fetchedUsers.push(docSnap.data() as AppUser);
       });
+      
+      // Sort in-memory to prevent index requirements & handle any missing createdAt fields gracefully
+      fetchedUsers.sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return timeB - timeA;
+      });
+      
       setUsers(fetchedUsers);
-    } catch (err) {
-      console.error('Error fetching users:', err);
-    } finally {
       setIsLoading(false);
-    }
-  };
+    }, (err) => {
+      console.error('Error listening to users collection:', err);
+      setError(`Gagal memuat daftar pengguna: ${err.message}`);
+      setIsLoading(false);
+    });
 
-  useEffect(() => {
-    fetchUsers();
+    return () => unsubscribe();
   }, []);
 
   const handleAddUser = async (e: React.FormEvent) => {
@@ -88,7 +92,6 @@ export default function UserManagement() {
       setEmail('');
       setPassword('');
       setRole('staff');
-      fetchUsers();
     } catch (err: any) {
       console.error('Error adding user:', err);
       if (err.code === 'auth/email-already-in-use') {
@@ -113,7 +116,6 @@ export default function UserManagement() {
       await setDoc(userDocRef, { approved: newApprovalStatus }, { merge: true });
       
       setSuccess(`Status persetujuan user "${user.name}" berhasil diubah menjadi ${newApprovalStatus ? 'DISETUJUI' : 'MENUNGGU PERSETUJUAN'}.`);
-      fetchUsers();
     } catch (err: any) {
       console.error('Error toggling user approval:', err);
       setError(`Gagal mengubah status persetujuan: ${err.message}`);
@@ -139,7 +141,6 @@ export default function UserManagement() {
       await deleteDoc(doc(db, 'users', user.uid));
       setSuccess(`User "${user.name}" berhasil dihapus dari daftar otorisasi.`);
       setDeleteConfirmUser(null);
-      fetchUsers();
     } catch (err: any) {
       console.error('Error deleting user document:', err);
       setError(`Gagal menghapus user: ${err.message}`);
@@ -159,11 +160,14 @@ export default function UserManagement() {
           </p>
         </div>
         <button
-          onClick={fetchUsers}
+          onClick={() => {
+            setSuccess('Daftar pengguna telah sinkron dengan server.');
+            setTimeout(() => setSuccess(null), 3000);
+          }}
           className="p-2 text-slate-500 hover:text-[#002B5B] hover:bg-slate-100 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-medium"
         >
           <RefreshCw className="w-4 h-4" />
-          Segarkan Daftar
+          Daftar Sinkron (Otomatis)
         </button>
       </div>
 

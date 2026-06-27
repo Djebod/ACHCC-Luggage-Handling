@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { auth, db, doc, getDoc, signOut } from './firebase';
+import { auth, db, doc, getDoc, setDoc, signOut } from './firebase';
 import { LuggageItem } from './types';
 import Login from './components/Login';
 import AstonLogo from './components/AstonLogo';
@@ -59,9 +59,31 @@ export default function App() {
               approved: userData.approved
             });
           } else {
-            // Profile document missing or deleted, sign them out
-            await signOut(auth);
-            setCurrentUser(null);
+            // Profile document missing, register them automatically to avoid race conditions
+            const email = firebaseUser.email || '';
+            const name = firebaseUser.displayName || 'Staff Google';
+            const isITM = email.toLowerCase() === 'itm@astoncirebon.com';
+            const role = isITM ? 'admin' : 'staff';
+            const approved = isITM ? true : false; // Staff needs approval
+
+            const newUserProfile = {
+              uid: firebaseUser.uid,
+              email,
+              name,
+              role,
+              approved,
+              createdAt: new Date().toISOString()
+            };
+
+            await setDoc(userDocRef, newUserProfile);
+
+            setCurrentUser({
+              uid: firebaseUser.uid,
+              email,
+              name,
+              role: role,
+              approved: approved
+            });
           }
         } catch (err) {
           console.error('Error fetching user metadata:', err);

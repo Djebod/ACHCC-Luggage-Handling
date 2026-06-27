@@ -9,6 +9,7 @@
         "email": { "type": "string" },
         "name": { "type": "string" },
         "role": { "type": "string", "enum": ["admin", "staff"] },
+        "approved": { "type": "boolean" },
         "createdAt": { "type": "string" }
       },
       "required": ["uid", "email", "name", "role", "createdAt"]
