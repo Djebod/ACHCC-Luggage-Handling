@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import QRCode from 'qrcode';
 import { db, doc, setDoc } from '../firebase';
 import { PublicDepositItem } from '../types';
+import { syncPublicDepositToGoogleSheet } from '../utils/sheetSync';
 import { 
   Camera, 
   Upload, 
@@ -222,6 +223,9 @@ export default function PublicDepositForm({ onBackToLogin }: PublicDepositFormPr
 
       // Save to public_deposits collection in Firestore
       await setDoc(doc(db, 'public_deposits', publicId), newPublicDeposit);
+
+      // Sync to Google Sheet
+      await syncPublicDepositToGoogleSheet('insert', newPublicDeposit);
 
       setSuccessItem(newPublicDeposit);
     } catch (err: any) {

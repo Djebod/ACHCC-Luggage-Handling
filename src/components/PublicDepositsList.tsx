@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db, collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc } from '../firebase';
 import { PublicDepositItem } from '../types';
+import { syncPublicDepositToGoogleSheet } from '../utils/sheetSync';
 import { 
   Search, 
   Filter, 
@@ -17,7 +18,8 @@ import {
   Phone,
   Calendar,
   AlertCircle,
-  Camera
+  Camera,
+  Download
 } from 'lucide-react';
 
 interface PublicDepositsListProps {
@@ -33,6 +35,8 @@ export default function PublicDepositsList({ currentUser }: PublicDepositsListPr
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Menunggu' | 'Sudah Diambil'>('All');
   const [jenisFilter, setJenisFilter] = useState<'All' | 'Makanan' | 'Minuman' | 'Barang'>('All');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   
   // Lightbox and action confirms
   const [activePhoto, setActivePhoto] = useState<string | null>(null);
@@ -44,6 +48,56 @@ export default function PublicDepositsList({ currentUser }: PublicDepositsListPr
   const [namaPenerimaAmbil, setNamaPenerimaAmbil] = useState('');
   const [catatanAmbil, setCatatanAmbil] = useState('');
   const [photoAmbil, setPhotoAmbil] = useState<string>('');
+
+  const exportToExcel = () => {
+    const headers = [
+      "ID",
+      "Tanggal Masuk",
+      "Jam Masuk",
+      "Jenis Barang",
+      "Nama Pengirim",
+      "No HP Pengirim",
+      "Nama Penerima",
+      "Keterangan/Catatan",
+      "Status",
+      "Diserahkan Oleh",
+      "Tanggal Diambil",
+      "Jam Diambil",
+      "Penerima Ambil",
+      "Catatan Ambil"
+    ];
+    
+    const rows = filteredItems.map(item => [
+      item.id,
+      item.date,
+      item.time,
+      item.jenisBarang,
+      `"${(item.namaPengirim || '').replace(/"/g, '""')}"`,
+      `"${(item.noHpPengirim || '').replace(/"/g, '""')}"`,
+      `"${(item.namaPenerima || '').replace(/"/g, '""')}"`,
+      `"${(item.keterangan || '').replace(/"/g, '""')}"`,
+      item.status,
+      `"${(item.handledBy || '').replace(/"/g, '""')}"`,
+      item.dateDelivered || '',
+      item.timeDelivered || '',
+      `"${(item.namaPenerimaAmbil || '').replace(/"/g, '""')}"`,
+      `"${(item.catatanAmbil || '').replace(/"/g, '""')}"`
+    ]);
+    
+    const csvContent = "\uFEFF" + [
+      headers.join(","),
+      ...rows.map(row => row.join(","))
+    ].join("\n");
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Data_Penitipan_Publik_${startDate || 'Awal'}_s.d_${endDate || 'Akhir'}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Real-time listener for Firestore public_deposits collection
   useEffect(() => {
@@ -79,6 +133,14 @@ export default function PublicDepositsList({ currentUser }: PublicDepositsListPr
       );
     }
 
+    // Apply Date Range Filter
+    if (startDate) {
+      result = result.filter(item => item.date >= startDate);
+    }
+    if (endDate) {
+      result = result.filter(item => item.date <= endDate);
+    }
+
     if (statusFilter !== 'All') {
       result = result.filter(item => item.status === statusFilter);
     }
@@ -88,7 +150,7 @@ export default function PublicDepositsList({ currentUser }: PublicDepositsListPr
     }
 
     setFilteredItems(result);
-  }, [items, searchQuery, statusFilter, jenisFilter]);
+  }, [items, searchQuery, statusFilter, jenisFilter, startDate, endDate]);
 
   const handlePhotoAmbilUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -124,16 +186,26 @@ export default function PublicDepositsList({ currentUser }: PublicDepositsListPr
       const localDate = `${year}-${month}-${day}`;
       const localTime = `${hours}:${minutes}`;
 
-      const itemRef = doc(db, 'public_deposits', item.id);
-      await updateDoc(itemRef, {
-        status: 'Sudah Diambil',
+      const updatePayload = {
+        status: 'Sudah Diambil' as const,
         handledBy: currentUser.name,
         dateDelivered: localDate,
         timeDelivered: localTime,
         namaPenerimaAmbil: namaPenerimaAmbil.trim(),
         catatanAmbil: catatanAmbil.trim() || '',
         photoAmbil: photoAmbil || ''
-      });
+      };
+
+      const updatedItem: PublicDepositItem = {
+        ...item,
+        ...updatePayload
+      };
+
+      const itemRef = doc(db, 'public_deposits', item.id);
+      await updateDoc(itemRef, updatePayload);
+
+      // Sync to Google Sheet
+      await syncPublicDepositToGoogleSheet('update', updatedItem);
 
       setCheckoutConfirmItem(null);
     } catch (err) {
@@ -262,7 +334,9 @@ export default function PublicDepositsList({ currentUser }: PublicDepositsListPr
 
         {/* Filters bar */}
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 space-y-4">
-          <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
+          
+          {/* Row 1: Search & Export Button */}
+          <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
             {/* Search Input */}
             <div className="relative w-full md:max-w-md">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -275,12 +349,70 @@ export default function PublicDepositsList({ currentUser }: PublicDepositsListPr
               />
             </div>
 
+            {/* Export Button */}
+            <button
+              onClick={exportToExcel}
+              className="w-full md:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow transition-all hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Download className="w-4 h-4" />
+              Export ke Excel (.csv)
+            </button>
+          </div>
+
+          {/* Row 2: Date Range & Dropdowns */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:flex md:flex-wrap items-center gap-3 border-t border-slate-100 pt-3">
+            
+            {/* Date range start */}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <span className="text-[10px] font-bold text-slate-400 uppercase shrink-0 min-w-[30px]">Dari</span>
+              <div className="relative w-full">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-slate-400">
+                  <Calendar className="w-3.5 h-3.5" />
+                </span>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full sm:w-auto pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-[#002B5B] font-medium cursor-pointer"
+                />
+              </div>
+            </div>
+
+            {/* Date range end */}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <span className="text-[10px] font-bold text-slate-400 uppercase shrink-0 min-w-[30px]">S/D</span>
+              <div className="relative w-full">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-slate-400">
+                  <Calendar className="w-3.5 h-3.5" />
+                </span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full sm:w-auto pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-[#002B5B] font-medium cursor-pointer"
+                />
+              </div>
+            </div>
+
+            {/* Reset Date filter */}
+            {(startDate || endDate) && (
+              <button
+                onClick={() => {
+                  setStartDate('');
+                  setEndDate('');
+                }}
+                className="text-[10px] text-[#002B5B] hover:underline font-semibold cursor-pointer py-1.5 px-2"
+              >
+                Reset Tanggal
+              </button>
+            )}
+
             {/* Selector Filters */}
-            <div className="flex flex-wrap gap-2 w-full md:w-auto justify-end">
+            <div className="flex flex-wrap gap-2 md:ml-auto w-full md:w-auto justify-end">
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none cursor-pointer"
+                className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none cursor-pointer"
               >
                 <option value="All">Semua Status</option>
                 <option value="Menunggu">Menunggu Diambil</option>
@@ -290,7 +422,7 @@ export default function PublicDepositsList({ currentUser }: PublicDepositsListPr
               <select
                 value={jenisFilter}
                 onChange={(e) => setJenisFilter(e.target.value as any)}
-                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none cursor-pointer"
+                className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none cursor-pointer"
               >
                 <option value="All">Semua Jenis Barang</option>
                 <option value="Makanan">Makanan</option>
@@ -299,6 +431,7 @@ export default function PublicDepositsList({ currentUser }: PublicDepositsListPr
               </select>
             </div>
           </div>
+
         </div>
 
         {/* Real-time Deposits List */}

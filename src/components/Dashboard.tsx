@@ -18,7 +18,9 @@ import {
   TrendingUp,
   Archive,
   Hourglass,
-  ExternalLink
+  ExternalLink,
+  Calendar,
+  Download
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -36,6 +38,8 @@ export default function Dashboard({ currentUser, onPrintRequest }: DashboardProp
   const [statusFilter, setStatusFilter] = useState<'All' | 'Gudang' | 'Sudah Diambil'>('All');
   const [typeFilter, setTypeFilter] = useState<string>('All');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   // Modal Lightbox state for viewing large image
   const [activePhoto, setActivePhoto] = useState<string | null>(null);
@@ -47,6 +51,56 @@ export default function Dashboard({ currentUser, onPrintRequest }: DashboardProp
     pickedUp: 0,
     avgDeliverMinutes: 0
   });
+
+  const exportToExcel = () => {
+    const headers = [
+      "ID",
+      "Tanggal Masuk",
+      "Jam Masuk",
+      "Diterima Oleh",
+      "Jenis Handling",
+      "Nama Tamu",
+      "No Kamar",
+      "Catatan/Remark",
+      "Status",
+      "Diserahkan Oleh",
+      "Tanggal Diambil",
+      "Jam Diambil",
+      "Lama Penyimpanan (Hari)",
+      "Lama Penyimpanan (Jam:Menit)"
+    ];
+    
+    const rows = filteredItems.map(item => [
+      item.id,
+      item.date,
+      item.time,
+      `"${(item.receiveBy || '').replace(/"/g, '""')}"`,
+      item.typeHandling,
+      `"${(item.namaTamu || '').replace(/"/g, '""')}"`,
+      `"${(item.roomNumber || '').replace(/"/g, '""')}"`,
+      `"${(item.remark || '').replace(/"/g, '""')}"`,
+      item.status,
+      `"${(item.handleBy || '').replace(/"/g, '""')}"`,
+      item.dateDelivered || '',
+      item.timeDelivered || '',
+      item.solvedTimeDay !== null ? item.solvedTimeDay : '',
+      item.solvedTimeHourMinutes || ''
+    ]);
+    
+    const csvContent = "\uFEFF" + [
+      headers.join(","),
+      ...rows.map(row => row.join(","))
+    ].join("\n");
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Data_Penitipan_Staf_${startDate || 'Awal'}_s.d_${endDate || 'Akhir'}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Real-time listener for Firestore luggage collection
   useEffect(() => {
@@ -120,6 +174,14 @@ export default function Dashboard({ currentUser, onPrintRequest }: DashboardProp
       );
     }
 
+    // Apply Date Range Filter
+    if (startDate) {
+      result = result.filter(item => item.date >= startDate);
+    }
+    if (endDate) {
+      result = result.filter(item => item.date <= endDate);
+    }
+
     // 2. Apply Status Filter
     if (statusFilter !== 'All') {
       result = result.filter(item => item.status === statusFilter);
@@ -138,7 +200,7 @@ export default function Dashboard({ currentUser, onPrintRequest }: DashboardProp
     }
 
     setFilteredItems(result);
-  }, [luggageItems, searchQuery, statusFilter, typeFilter, sortOrder]);
+  }, [luggageItems, searchQuery, statusFilter, typeFilter, sortOrder, startDate, endDate]);
 
   const [deliverConfirmItem, setDeliverConfirmItem] = useState<LuggageItem | null>(null);
   const [deleteConfirmItem, setDeleteConfirmItem] = useState<LuggageItem | null>(null);
@@ -285,61 +347,120 @@ export default function Dashboard({ currentUser, onPrintRequest }: DashboardProp
       </div>
 
       {/* Searching & Filters Controls */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 flex flex-col md:flex-row gap-3 items-center justify-between">
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 space-y-4">
         
-        {/* Search */}
-        <div className="relative w-full md:max-w-sm">
-          <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
-            <Search className="w-4 h-4" />
-          </span>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari nama tamu, nomor kamar, atau ID..."
-            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-amber-400 focus:bg-white transition-colors"
-          />
-        </div>
-
-        {/* Filters Group */}
-        <div className="flex flex-wrap gap-2 w-full md:w-auto items-center justify-end">
-          
-          {/* Status Filter */}
-          <div className="flex items-center gap-1.5">
-            <Filter className="w-3.5 h-3.5 text-slate-400" />
-            <select
-              value={statusFilter}
-              onChange={(e: any) => setStatusFilter(e.target.value)}
-              className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-amber-400 font-medium"
-            >
-              <option value="All">Semua Status</option>
-              <option value="Gudang">Di Gudang</option>
-              <option value="Sudah Diambil">Sudah Diambil</option>
-            </select>
+        {/* Row 1: Search & Export Button */}
+        <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
+          {/* Search */}
+          <div className="relative w-full md:max-w-md">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+              <Search className="w-4 h-4" />
+            </span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cari nama tamu, nomor kamar, atau ID..."
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-amber-400 focus:bg-white transition-colors"
+            />
           </div>
 
-          {/* Type Filter */}
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-amber-400 font-medium"
+          {/* Export Button */}
+          <button
+            onClick={exportToExcel}
+            className="w-full md:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow transition-all hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer"
           >
-            <option value="All">Semua Handling</option>
-            <option value="Koper">Koper</option>
-            <option value="Kardus">Kardus</option>
-            <option value="Tas Ransel">Tas Ransel</option>
-            <option value="Lain Lain">Lain Lain</option>
-          </select>
+            <Download className="w-4 h-4" />
+            Export ke Excel (.csv)
+          </button>
+        </div>
 
-          {/* Sort Order */}
-          <select
-            value={sortOrder}
-            onChange={(e: any) => setSortOrder(e.target.value)}
-            className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-amber-400 font-medium"
-          >
-            <option value="newest">Paling Baru</option>
-            <option value="oldest">Paling Lama</option>
-          </select>
+        {/* Row 2: Date Filters & Selects */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:flex md:flex-wrap items-center gap-3 border-t border-slate-100 pt-3">
+          
+          {/* Date range start */}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <span className="text-[10px] font-bold text-slate-400 uppercase shrink-0 min-w-[30px]">Dari</span>
+            <div className="relative w-full">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-slate-400">
+                <Calendar className="w-3.5 h-3.5" />
+              </span>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full sm:w-auto pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-amber-400 font-medium cursor-pointer"
+              />
+            </div>
+          </div>
+
+          {/* Date range end */}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <span className="text-[10px] font-bold text-slate-400 uppercase shrink-0 min-w-[30px]">S/D</span>
+            <div className="relative w-full">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-slate-400">
+                <Calendar className="w-3.5 h-3.5" />
+              </span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-full sm:w-auto pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-amber-400 font-medium cursor-pointer"
+              />
+            </div>
+          </div>
+
+          {/* Reset Date filter */}
+          {(startDate || endDate) && (
+            <button
+              onClick={() => {
+                setStartDate('');
+                setEndDate('');
+              }}
+              className="text-[10px] text-[#002B5B] hover:underline font-semibold cursor-pointer py-1.5 px-2"
+            >
+              Reset Tanggal
+            </button>
+          )}
+
+          <div className="flex flex-wrap gap-2 md:ml-auto w-full md:w-auto justify-end">
+            {/* Status Filter */}
+            <div className="flex items-center gap-1.5">
+              <Filter className="w-3.5 h-3.5 text-slate-400" />
+              <select
+                value={statusFilter}
+                onChange={(e: any) => setStatusFilter(e.target.value)}
+                className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-amber-400 font-medium"
+              >
+                <option value="All">Semua Status</option>
+                <option value="Gudang">Di Gudang</option>
+                <option value="Sudah Diambil">Sudah Diambil</option>
+              </select>
+            </div>
+
+            {/* Type Filter */}
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-amber-400 font-medium"
+            >
+              <option value="All">Semua Handling</option>
+              <option value="Koper">Koper</option>
+              <option value="Kardus">Kardus</option>
+              <option value="Tas Ransel">Tas Ransel</option>
+              <option value="Lain Lain">Lain Lain</option>
+            </select>
+
+            {/* Sort Order */}
+            <select
+              value={sortOrder}
+              onChange={(e: any) => setSortOrder(e.target.value)}
+              className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-amber-400 font-medium"
+            >
+              <option value="newest">Paling Baru</option>
+              <option value="oldest">Paling Lama</option>
+            </select>
+          </div>
 
         </div>
 
